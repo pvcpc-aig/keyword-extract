@@ -13,7 +13,11 @@ import random
 import udax as dx
 from nltk import pos_tag
 from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
 from pathlib import Path
+
+
+useless_words = set(stopwords.words("english"))
 
 
 # The INSPEC dataset is behind a paywall, so at the moment
@@ -100,14 +104,20 @@ def gen_graph(words, defscore=1, cofact=2):
     def _link_words(i, j): # i - index of the parent word, j - index of the child word
         nonlocal map, graph
 
-        Lout = graph[i][3]
-        Lin = graph[j][2]
+        _, _, Iin, Iout = graph[i]
+        _, _, Jin, Jout = graph[j]
 
-        if j not in Lout:
-            Lout.append(j)
+        # this will effectively create an undirected graph, simulated
+        # by bidirection.
+        if j not in Iin:
+            Iin.append(j)
+        if j not in Iout:
+            Iout.append(j)
 
-        if i not in Lin:
-            Lin.append(i)
+        if i not in Jin:
+            Jin.append(i)
+        if i not in Jout:
+            Jout.append(i)
 
     for i, word in enumerate(words):
         main_i = _push_word(word)
@@ -130,18 +140,11 @@ def rank(G, i, damp=0.85, visited=None):
         T[2] - The list of inward directed indices.
         T[3] - The list of outward directed indices.
     """
-    # if visited is None:
-    #     visited = set()
-
     word, score, Lin, Lout = G[i]
-    # if i in visited:
-    #     return score
-    # visited.add(i)
 
     sum = 0
     for j in Lin:
         _, Jscore, _, Jout = G[j]
-        # sum += rank(G, j, visited=visited) / len(Jout)
         sum += Jscore / len(Jout)
     return (1 - damp) + damp * sum
 
@@ -149,58 +152,74 @@ def rank(G, i, damp=0.85, visited=None):
 def rank_sample(sample, convthresh=1e-4):
     # preprocess the sample text first
     print("Filtering sample...")
-    # tokenized = word_tokenize(sample)
-    tokenized = dx.s_norm(sample).split()
+    # tokenized = dx.s_norm(sample).split()
+    tokenized = word_tokenize(sample)
     tagged = pos_tag(tokenized)
     filtered = filter(is_noun_or_adj, tagged)
     extracted = [ x[0] for x in filtered ]
+    # extracted = list(filter(lambda x: x not in useless_words, tokenized))
 
     # generate graph and process it
     print("Generating graph...")
-    map, graph = gen_graph(extracted)
-    if len(graph) > 0:
-        rank(graph, 0)
+    map, graph = gen_graph(extracted, defscore=1/len(extracted))
+    rescore_buffer = [ x[1] for x in graph ]
 
-    def _score(stop_on_conv=True):
-        nonlocal convthresh, graph
-
+    print("Processing...")
+    iterations = 0
+    while True:
+        iterations += 1
         min_err = 1
-        rescore_buffer = [ x[1] for x in graph ]
         for i, e in enumerate(graph):
             n_score = rank(graph, i)
             err = n_score - rescore_buffer[i]
             rescore_buffer[i] = n_score
             if err < min_err:
                 min_err = err
-            if stop_on_conv and err <= convthresh:
+            if min_err <= convthresh: # the paper says "any node", I wonder if that's correct
                 break
-        
         for i, s in enumerate(rescore_buffer):
             graph[i][1] = s
-
-        return min_err
-
-    print("Processing...")
-    iterations = 1
-    _score(stop_on_conv=False)
-    while True:
-        iterations += 1
-        if _score() <= convthresh:
+        if min_err <= convthresh:
             break
-    
+
     print(f"Reached conversion after {iterations} iterations.")
 
     # We sort the graph by the newly computed score, and reverse
     # it so that the highest score is first.
-    ranked = sorted(graph, key=lambda x: x[1], reverse=True)
-    # for r in ranked:
-    #     print(r)
-    return [ x[0] for x in ranked ]
+    table = sorted(graph, key=lambda x: x[1], reverse=True)
+    table_set = set([ x[0] for x in table ])
+
+    # Collapse multi-word keywords into a single entry:
+    collapsed = []
+    i = 0
+    while i < len(tokenized):
+        word = tokenized[i]
+        if word in table_set:
+            streak = [ word ]
+            j = i + 1
+            while j < len(tokenized):
+                n_word = tokenized[j]
+                if n_word not in table_set:
+                    break
+                streak.append(n_word)
+                j += 1
+
+            if len(streak) > 1:
+                i += j - 1 - i
+                collapsed.append(' '.join(streak))
+        i += 1
+    
+    return table, collapsed
 
 
 if __name__ == "__main__":
     for i, sample in enumerate(samples):
-        keywords = rank_sample(sample)
-        print(f"Top 5 keywords in sample {i+1}:")
-        for j in range(5):
-            print(f"{j+1}. {keywords[j]}")
+        table, collapsed = rank_sample(sample)
+
+        print(f"Top keywords in sample {i+1}:")
+        for j in range(25):
+            print(f"{j+1}. {table[j][0]}")
+
+        print(f"Collapsed keywords in sample {i+1}:")
+        for j, e in enumerate(collapsed):
+            print(f"{j+1}. {e}")
