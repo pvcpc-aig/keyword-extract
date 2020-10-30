@@ -140,7 +140,7 @@ def rank(G, i, damp=0.85, visited=None):
         T[2] - The list of inward directed indices.
         T[3] - The list of outward directed indices.
     """
-    word, score, Lin, Lout = G[i]
+    _, _, Lin, _ = G[i]
 
     sum = 0
     for j in Lin:
