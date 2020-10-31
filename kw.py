@@ -46,7 +46,7 @@ def is_noun_or_adj(word_info):
     return pos.startswith("NN") or pos.startswith("JJ")
 
 
-def gather_proxy(L, i, radius=2):
+def gather_proxy(L, i, radius=3):
     """
     Collects all of the elements around the index `i` in list `L` that
     are within `radius` indices of itself. This does not include the
@@ -120,8 +120,6 @@ def gen_graph(words, defscore=1, cofact=2):
             Jout.append(i)
 
     for i, word in enumerate(words):
-        main_i = _push_word(word)
-        proxies = gather_proxy(words, i, radius=cofact)
         for proxy in proxies:
             proxy_i = _push_word(proxy)
             _link_words(main_i, proxy_i)
