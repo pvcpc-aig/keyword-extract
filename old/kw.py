@@ -164,6 +164,9 @@ def rank_sample(sample, convthresh=1e-4):
     map, graph = gen_graph(extracted, defscore=1/len(extracted))
     rescore_buffer = [ x[1] for x in graph ]
 
+    for g in graph:
+        print(g)
+
     print("Processing...")
     iterations = 0
     while True:

@@ -1,4 +1,5 @@
 import udax as dx
+from udax.pagerank import PageRank, proxy, pagerank
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk import pos_tag
@@ -39,16 +40,19 @@ def rank_func(graph_view, i, damp=0.85):
 if __name__ == "__main__":
 
     # try for various damping factors 
-    damps = [ 0.50, 0.60, 0.70, 0.75, 0.85 ]
-    for d in damps:
-        pr = dx.PageRank(
-            preprocs=[ word_tokenize, pos_tag, noun_and_adj_only ],
-            link_func=dx.PrLinkMaker.proxy(),
-            rank_func=dx.PrRanker.pagerank(damp=d)
-        )
-        pr.feed(sample)
-        pr.set_inverse_uniform_scores()
-        table = pr.execute()
-        print(f"For damp factor {d}:")
-        for i in range (4):
-            print("[%.2f] %s" % (table[i][1], table[i][0]))
+    # damps = [ 0.50, 0.60, 0.70, 0.75, 0.85 ]
+    # for d in damps:
+    #     pr = dx.PageRank(
+    #         preprocs=[ word_tokenize, pos_tag, noun_and_adj_only ],
+    #         link_func=dx.PrLinkMaker.proxy(),
+    #         rank_func=dx.PrRanker.pagerank(damp=d)
+    #     )
+    #     pr.feed(sample)
+    #     pr.set_inverse_uniform_scores()
+    #     table = pr.execute()
+    #     print(f"For damp factor {d}:")
+    #     for i in range (4):
+    #         print("[%.2f] %s" % (table[i][1], table[i][0]))
+    pr = PageRank(
+
+    )
